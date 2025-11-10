@@ -1,4 +1,4 @@
-# models/eomt_mrl.py
+# models/eomt_mrl.py - CORRECT VERSION
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -73,6 +73,4 @@ class EoMT_MRL(EoMT):
         # Use original EoMT forward pass
         mask_logits_per_layer, class_logits_per_layer = super().forward(x)
         
-        # For now, we'll apply MRL at the class prediction level
-        # In a more advanced version, we'd modify the internal _predict method
         return mask_logits_per_layer, class_logits_per_layer
