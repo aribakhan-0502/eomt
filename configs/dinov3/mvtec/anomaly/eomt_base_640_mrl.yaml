@@ -1,0 +1,43 @@
+trainer:
+  max_epochs: 50
+  logger:
+    class_path: lightning.pytorch.loggers.wandb.WandbLogger
+    init_args:
+      resume: allow
+      project: "mrl_eomt_mvtec"
+      name: "mvtec_anomaly_eomt_base_640_mrl"
+
+model:
+  class_path: training.mrl_anomaly_detection.MRL_AnomalyDetection
+  init_args:
+    attn_mask_annealing_enabled: True
+    attn_mask_annealing_start_steps: [0, 5000, 10000]
+    attn_mask_annealing_end_steps: [2000, 7000, 15000]
+    lr: 1e-4
+    llrd_l2_enabled: False
+    warmup_steps: [1000, 2000]
+    delta_weights: True
+    nesting_list: [64, 128, 256, 512, 1024]
+    relative_importance: [0.1, 0.2, 0.3, 0.2, 0.2]
+    
+    network:
+      class_path: models.mrl_eomt.MRL_EoMT
+      init_args:
+        num_q: 100
+        num_blocks: 3
+        nesting_list: [64, 128, 256, 512, 1024]
+        efficient: False
+        encoder:
+          class_path: models.vit.ViT
+          init_args:
+            backbone_name: facebook/dinov3-vitb16-pretrain-lvd1689m
+            img_size: [640, 640]
+
+data:
+  class_path: datasets.mvtec_data_module.MVTecDataModule
+  init_args:
+    data_path: "/content/drive/MyDrive/MS_Anomaly_Detection/01_datasets/mvtec_ad"
+    category: "bottle"  # You can change this per run
+    img_size: [640, 640]
+    batch_size: 8
+    num_workers: 4

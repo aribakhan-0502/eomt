@@ -1,13 +1,6 @@
-# models/__init__.py - UPDATED
 from .eomt import EoMT
-from .eomt_mrl import EoMT_MRL, MRL_Linear_Layer
-from .scale_block import ScaleBlock
+from .mrl_eomt import MRL_EoMT
 from .vit import ViT
+from .scale_block import ScaleBlock
 
-__all__ = [
-    "EoMT", 
-    "EoMT_MRL",
-    "MRL_Linear_Layer",
-    "ScaleBlock", 
-    "ViT",
-]
+__all__ = ["EoMT", "MRL_EoMT", "ViT", "ScaleBlock"]
