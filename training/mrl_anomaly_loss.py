@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import List
+from training.mask_classification_loss import MaskClassificationLoss
 
 class MRL_Anomaly_Loss(nn.Module):
     def __init__(
