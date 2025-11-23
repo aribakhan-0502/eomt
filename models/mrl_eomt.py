@@ -118,6 +118,42 @@ class MRL_EoMT(nn.Module):
         )
         return attn_mask
 
+    def _attn(
+    self,
+    module: nn.Module,
+    x: torch.Tensor,
+    mask: Optional[torch.Tensor],
+    rope: Optional[torch.Tensor],):
+        if rope is not None:
+            if mask is not None:
+                mask = mask[:, None, ...].expand(-1, module.num_heads, -1, -1)
+            return module(x, mask, rope)[0]
+
+        B, N, C = x.shape
+
+        qkv = module.qkv(x).reshape(B, N, 3, module.num_heads, module.head_dim)
+        q, k, v = qkv.permute(2, 0, 3, 1, 4).unbind(0)
+        q, k = module.q_norm(q), module.k_norm(k)
+
+        if mask is not None:
+            mask = mask[:, None, ...].expand(-1, module.num_heads, -1, -1)
+
+        dropout_p = module.attn_drop.p if self.training else 0.0
+
+        if module.fused_attn:
+            x = F.scaled_dot_product_attention(q, k, v, mask, dropout_p)
+        else:
+            attn = (q @ k.transpose(-2, -1)) * module.scale
+            if mask is not None:
+                attn = attn.masked_fill(~mask, float("-inf"))
+            attn = F.softmax(attn, dim=-1)
+            attn = module.attn_drop(attn)
+            x = attn @ v
+
+        x = module.proj_drop(module.proj(x.transpose(1, 2).reshape(B, N, C)))
+
+        return x
+
     def forward(self, x: torch.Tensor):
         x = (x - self.encoder.pixel_mean) / self.encoder.pixel_std
 
