@@ -48,8 +48,8 @@ class MRL_AnomalyDetection(LightningModule):
         self.val_f1 = F1Score(task="binary", num_classes=2)
         self.val_auroc = AUROC(task="binary", num_classes=2)
         
-        # For segmentation metrics
-        self.val_map = MeanAveragePrecision(iou_type="segm")
+        # For segmentation metrics - COMMENTED OUT TEMPORARILY
+        # self.val_map = MeanAveragePrecision(iou_type="segm")
 
     def training_step(self, batch, batch_idx):
         imgs, targets = batch
@@ -58,7 +58,7 @@ class MRL_AnomalyDetection(LightningModule):
 
         losses_all_blocks = {}
         for block_idx, (mask_logits_block, class_logits_block) in enumerate(
-            zip(mask_logits_per_block_nested, class_logits_per_block_nested)
+            zip(mask_logits_per_block_nested, class_logits_block_nested)
         ):
             losses = self.criterion(
                 masks_queries_logits_nested=[mask_logits_block],
@@ -105,9 +105,9 @@ class MRL_AnomalyDetection(LightningModule):
                 self.val_f1(anomaly_scores, anomaly_labels)
                 self.val_auroc(anomaly_scores, anomaly_labels)
                 
-                # Segmentation metrics for anomalous regions
-                pred_masks = self._get_predicted_masks(final_mask_logits, final_class_logits)
-                self.val_map.update(pred_masks, targets)
+                # Segmentation metrics for anomalous regions - COMMENTED OUT TEMPORARILY
+                # pred_masks = self._get_predicted_masks(final_mask_logits, final_class_logits)
+                # self.val_map.update(pred_masks, targets)
             
             elif prefix == "test":
                 self.test_accuracy(anomaly_scores, anomaly_labels)
@@ -146,7 +146,7 @@ class MRL_AnomalyDetection(LightningModule):
             
                 # Convert to binary masks and ensure uint8 dtype
                 binary_masks = (pred_masks > mask_threshold)
-                binary_masks = binary_masks.to(torch.uint8)  # ← ADD THIS LINE
+                binary_masks = binary_masks.to(torch.uint8)
             
                 prediction = {
                     "masks": binary_masks,
@@ -155,7 +155,7 @@ class MRL_AnomalyDetection(LightningModule):
                 }
             else:
                 prediction = {
-                    "masks": torch.zeros(0, *mask_logits.shape[-2:], dtype=torch.uint8),  # ← CHANGE dtype
+                    "masks": torch.zeros(0, *mask_logits.shape[-2:], dtype=torch.uint8),
                     "scores": torch.zeros(0),
                     "labels": torch.zeros(0, dtype=torch.long),
                 }
@@ -172,10 +172,10 @@ class MRL_AnomalyDetection(LightningModule):
         self.log("metrics/val_f1", self.val_f1.compute())
         self.log("metrics/val_auroc", self.val_auroc.compute())
         
-        # Log segmentation metrics
-        map_results = self.val_map.compute()
-        self.log("metrics/val_map", map_results["map"])
-        self.log("metrics/val_map_50", map_results["map_50"])
+        # Log segmentation metrics - COMMENTED OUT TEMPORARILY
+        # map_results = self.val_map.compute()
+        # self.log("metrics/val_map", map_results["map"])
+        # self.log("metrics/val_map_50", map_results["map_50"])
         
         # Reset metrics
         self.val_accuracy.reset()
@@ -183,7 +183,7 @@ class MRL_AnomalyDetection(LightningModule):
         self.val_recall.reset()
         self.val_f1.reset()
         self.val_auroc.reset()
-        self.val_map.reset()
+        # self.val_map.reset()  # COMMENTED OUT
 
     def on_test_epoch_end(self):
         self.log("metrics/test_accuracy", self.test_accuracy.compute())
