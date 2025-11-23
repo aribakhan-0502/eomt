@@ -3,12 +3,11 @@ import os
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any
 import torch
+from torch.utils.data import Dataset
 from torchvision import tv_tensors
 from torchvision.transforms.v2 import functional as F
 from PIL import Image
 import numpy as np
-
-from .dataset import Dataset
 
 
 class MVTecAnomaly(Dataset):
@@ -21,10 +20,13 @@ class MVTecAnomaly(Dataset):
         transforms: Optional[Any] = None,
         **kwargs
     ):
+        super().__init__()
+        
         self.data_path = Path(data_path)
         self.category = category
         self.split = split
         self.img_size = img_size
+        self.transforms = transforms
         
         # For anomaly detection, we have 2 classes: normal (0) and anomalous (1)
         self.num_classes = 2
@@ -35,15 +37,6 @@ class MVTecAnomaly(Dataset):
         self.mask_paths = []  # Path to ground truth masks for anomalous samples
         
         self._build_dataset()
-        
-        super().__init__(
-            zip_path=self.data_path,  # Not using zip files, using directory structure
-            img_suffix=".png",
-            target_parser=self._target_parser,
-            check_empty_targets=False,
-            transforms=transforms,
-            **kwargs
-        )
 
     def _build_dataset(self):
         """Build the dataset from MVTec AD directory structure"""
@@ -93,7 +86,33 @@ class MVTecAnomaly(Dataset):
             return mask_file
         return None
 
-    def _target_parser(self, target=None, target_instance=None, **kwargs):
+    def __getitem__(self, index: int):
+        """Get item with proper index handling"""
+        # Load image
+        img_path = self.imgs[index]
+        img = tv_tensors.Image(Image.open(img_path).convert("RGB"))
+        
+        # Resize image if needed
+        if img.shape[-2:] != self.img_size:
+            img = F.resize(img, list(self.img_size))
+        
+        # Parse target
+        masks, labels, is_crowd = self._parse_target(index)
+        
+        target = {
+            "masks": tv_tensors.Mask(torch.stack(masks) if masks else torch.zeros(0, *self.img_size)),
+            "labels": torch.tensor(labels),
+            "is_crowd": torch.tensor(is_crowd),
+            "anomaly_label": torch.tensor(self.labels[index]),  # Overall image label
+            "image_path": img_path
+        }
+        
+        if self.transforms is not None:
+            img, target = self.transforms(img, target)
+        
+        return img, target
+
+    def _parse_target(self, index: int):
         """
         Parse targets for anomaly detection.
         Returns masks, labels, and is_crowd for each instance.
@@ -102,12 +121,10 @@ class MVTecAnomaly(Dataset):
         labels = []
         is_crowd = []
         
-        idx = kwargs.get('index', 0)
-        
-        if self.labels[idx] == 1 and self.mask_paths[idx] is not None:
+        if self.labels[index] == 1 and self.mask_paths[index] is not None:
             # Anomalous sample with mask
             try:
-                mask = Image.open(self.mask_paths[idx]).convert('L')
+                mask = Image.open(self.mask_paths[index]).convert('L')
                 mask_tensor = tv_tensors.Mask(mask)
                 
                 # Resize mask to match image size if needed
@@ -127,7 +144,7 @@ class MVTecAnomaly(Dataset):
                     is_crowd.append(False)
                     
             except Exception as e:
-                print(f"Error loading mask {self.mask_paths[idx]}: {e}")
+                print(f"Error loading mask {self.mask_paths[index]}: {e}")
         
         # If no masks found (normal sample or mask loading failed), create empty mask
         if not masks:
@@ -138,39 +155,5 @@ class MVTecAnomaly(Dataset):
         
         return masks, labels, is_crowd
 
-    def __getitem__(self, index: int):
-        """Get item with proper index handling"""
-        # Load image
-        img_path = self.imgs[index]
-        img = tv_tensors.Image(Image.open(img_path).convert("RGB"))
-        
-        # Resize image if needed
-        if img.shape[-2:] != self.img_size:
-            img = F.resize(img, list(self.img_size))
-        
-        # Parse target
-        masks, labels, is_crowd = self._target_parser(index=index)
-        
-        target = {
-            "masks": tv_tensors.Mask(torch.stack(masks) if masks else torch.zeros(0, *self.img_size)),
-            "labels": torch.tensor(labels),
-            "is_crowd": torch.tensor(is_crowd),
-            "anomaly_label": torch.tensor(self.labels[index]),  # Overall image label
-            "image_path": img_path
-        }
-        
-        if self.transforms is not None:
-            img, target = self.transforms(img, target)
-        
-        return img, target
-
     def __len__(self):
         return len(self.imgs)
-
-    def close(self):
-        """Override close method for directory-based dataset"""
-        pass
-
-    def _load_zips(self):
-        """Override zip loading for directory-based dataset"""
-        return None, None, None
