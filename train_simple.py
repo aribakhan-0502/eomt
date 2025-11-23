@@ -8,25 +8,29 @@ from models.mrl_eomt import MRL_EoMT
 from models.vit import ViT
 
 def main():
-    # Configuration
+    # Configuration - REDUCED FOR GPU MEMORY
     data_path = "/content/drive/MyDrive/MS_Anomaly_Detection/01_datasets/mvtec_ad"
     category = "bottle"
-    img_size = (640, 640)
-    batch_size = 8
+    img_size = (512, 512)  # Reduced from 640 to save memory
+    batch_size = 4         # Reduced from 8 to save memory
     max_epochs = 50
+    
+    # Clear GPU memory before starting
+    torch.cuda.empty_cache()
+    print(f"GPU memory cleared. Available: {torch.cuda.get_device_properties(0).total_memory/1e9:.1f}GB")
     
     # Data module
     data_module = MVTecDataModule(
         data_path=data_path,
         category=category,
-        img_size=img_size,
-        batch_size=batch_size,
-        num_workers=4,
+        img_size=img_size,      # Updated
+        batch_size=batch_size,  # Updated
+        num_workers=2,          # Reduced from 4
     )
     
     # Model
     encoder = ViT(
-        img_size=img_size,
+        img_size=img_size,      # Updated
         backbone_name="facebook/dinov3-vitb16-pretrain-lvd1689m",
     )
     
@@ -41,7 +45,7 @@ def main():
     
     model = MRL_AnomalyDetection(
         network=network,
-        img_size=img_size,
+        img_size=img_size,      # Updated
         num_classes=2,
         nesting_list=[64, 128, 256, 512, 1024],
         relative_importance=[0.1, 0.2, 0.3, 0.2, 0.2],
