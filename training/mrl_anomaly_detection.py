@@ -129,24 +129,25 @@ class MRL_AnomalyDetection(LightningModule):
         """Convert model outputs to detection format for metrics"""
         batch_size = mask_logits.shape[0]
         predictions = []
-        
+    
         for i in range(batch_size):
             # Get masks and class predictions
             masks = torch.sigmoid(mask_logits[i])  # [num_queries, H, W]
             class_probs = torch.softmax(class_logits[i], dim=-1)  # [num_queries, num_classes+1]
-            
+        
             # Filter out background and low-confidence predictions
             scores, labels = torch.max(class_probs[:, :-1], dim=-1)  # Exclude background
             keep = scores > 0.1  # Confidence threshold
-            
+        
             if keep.any():
                 pred_masks = masks[keep]
                 pred_scores = scores[keep]
                 pred_labels = labels[keep]
-                
-                # Convert to binary masks
+            
+                # Convert to binary masks and ensure uint8 dtype
                 binary_masks = (pred_masks > mask_threshold)
-                
+                binary_masks = binary_masks.to(torch.uint8)  # ← ADD THIS LINE
+            
                 prediction = {
                     "masks": binary_masks,
                     "scores": pred_scores,
@@ -154,13 +155,13 @@ class MRL_AnomalyDetection(LightningModule):
                 }
             else:
                 prediction = {
-                    "masks": torch.zeros(0, *mask_logits.shape[-2:], dtype=torch.bool),
+                    "masks": torch.zeros(0, *mask_logits.shape[-2:], dtype=torch.uint8),  # ← CHANGE dtype
                     "scores": torch.zeros(0),
                     "labels": torch.zeros(0, dtype=torch.long),
                 }
-            
-            predictions.append(prediction)
         
+            predictions.append(prediction)
+    
         return predictions
 
     def on_validation_epoch_end(self):
