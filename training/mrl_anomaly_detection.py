@@ -58,7 +58,7 @@ class MRL_AnomalyDetection(LightningModule):
 
         losses_all_blocks = {}
         for block_idx, (mask_logits_block, class_logits_block) in enumerate(
-            zip(mask_logits_per_block_nested, class_logits_block_nested)
+            zip(mask_logits_per_block_nested, class_logits_per_block_nested)
         ):
             losses = self.criterion(
                 masks_queries_logits_nested=[mask_logits_block],
